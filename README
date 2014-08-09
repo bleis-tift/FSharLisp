@@ -1,11 +1,11 @@
-== OCamLisp
+== FSharLisp
 
-Lisp implementation in OCaml.
+Lisp implementation in FSharp.
 
 
 == How to use
 
-% ocaml ocamlisp.ml  # or, ocamlopt -o ocamlisp ocamlisp.ml && ./ocamlisp
+% fsi --use:fsharlisp.fs
 > (car '(a b c))
 a
 > (cdr '(a b c))
