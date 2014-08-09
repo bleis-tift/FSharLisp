@@ -1,20 +1,6 @@
-#nowarn "62"
-
-exception Failure of string
-
 let (==) a b = obj.ReferenceEquals(a, b)
-let (mod) a b = a % b
 
-let int_of_string (str: string) =
-  try int str with :? System.FormatException -> raise (Failure "int_of_string")
-let string_of_int (i: int) = string i
-
-let print_string str = printf "%s" str
-let print_newline () = printfn ""
 let read_line () = System.Console.ReadLine()
-
-module String =
-  let sub (str: System.String) start len = str.Substring(start, len)
 
 let kLPar = '('
 let kRPar = ')'
@@ -86,30 +72,31 @@ let skipSpaces (str: System.String) =
   str.TrimStart()
 
 let makeNumOrSym str =
-  try Num (int_of_string str) with
-  | Failure "int_of_string" -> makeSym str
+  match System.Int32.TryParse(str) with
+  | true, num -> Num num
+  | _ -> makeSym str
 
 let position f str =
   str |> Seq.tryFindIndex f
 
-let readAtom str =
+let readAtom (str: System.String) =
   match position isDelimiter str with
   | Some n ->
-      (makeNumOrSym (String.sub str 0 n),
-       String.sub str n (String.length str - n))
+      (makeNumOrSym (str.Substring(0, n)),
+       str.Substring(n, String.length str - n))
   | None -> (makeNumOrSym str, "")
 
 let lookAhead str =
    let str1 = skipSpaces str
    let c = if str1 = "" then '_' else str.[0]
    let rest = if str1 = "" then ""
-              else String.sub str1 1 (String.length str1 - 1)
+              else str1.Substring(1)
    (str1, c, rest)
 
 let rec read str =
   let (str1, c, rest) = lookAhead str
   if str1 = "" then (Error "empty input", "")
-  else if c = kRPar then (Error ("invalid syntax: " ^ str1), "")
+  else if c = kRPar then (Error ("invalid syntax: " + str1), "")
   else if c = kLPar then readList rest Nil
   else if c = kQuote then readQuote rest
   else readAtom str1
@@ -127,18 +114,18 @@ and readList str acc =
 
 let rec printObj = function
   | Nil -> "nil"
-  | Num n -> string_of_int n
+  | Num n -> string n
   | Sym s -> s
-  | Error s -> "<error: " ^ s ^ ">"
-  | Cons _ as obj -> "(" ^ (printList obj "" "") ^ ")"
+  | Error s -> "<error: " + s + ">"
+  | Cons _ as obj -> "(" + (printList obj "" "") + ")"
   | Subr _ -> "<subr>"
   | Expr _ -> "<expr>"
 and printList obj delimiter acc =
   match obj with
   | Cons(a, d) ->
-      printList !d " " (acc ^ delimiter ^ printObj !a)
+      printList !d " " (acc + delimiter + printObj !a)
   | Nil -> acc
-  | _ -> acc ^ " . " ^ printObj obj
+  | _ -> acc + " . " + printObj obj
 
 let rec findVarInFrame str alist =
   match safeCar (safeCar alist) with
@@ -169,7 +156,7 @@ let rec eval obj env =
   match obj with
   | Sym _ ->
       match findVar obj env with
-      | Nil -> Error ((printObj obj) ^ " has no value")
+      | Nil -> Error ((printObj obj) + " has no value")
       | pair -> safeCdr(pair)
   | Cons _ -> evalCons obj env
   | _ -> obj
@@ -211,7 +198,7 @@ and apply f args env =
   | _, Error e -> Error e
   | Subr f1, _ -> f1 args
   | Expr(a, b, e) ,_ -> progn b (makeCons (pairlis a args) e) Nil
-  | _ -> Error ((printObj f) ^ " is not function")
+  | _ -> Error ((printObj f) + " is not function")
 
 let subrCar args = safeCar (safeCar args)
 
@@ -261,12 +248,11 @@ let subrSubOrDivOrMod f =
     | _ -> Error "wrong type"
 let subrSub = subrSubOrDivOrMod (-)
 let subrDiv = subrSubOrDivOrMod (/)
-let subrMod = subrSubOrDivOrMod (mod)
+let subrMod = subrSubOrDivOrMod (%)
 
 let rec repl prompt =
-  print_string prompt
-  print_string (printObj (eval (fst (read (read_line ()))) gEnv))
-  print_newline ()
+  printf "%s" prompt
+  printfn "%s" (printObj (eval (fst (read (read_line ()))) gEnv))
   repl prompt
 
 let () =
@@ -283,4 +269,4 @@ let () =
   addToEnv (makeSym "/") (Subr subrDiv) gEnv
   addToEnv (makeSym "mod") (Subr subrMod) gEnv
   addToEnv (makeSym "t") (makeSym "t") gEnv
-  try repl "> " with End_of_file -> ()
+  try repl "> " with _ -> ()
