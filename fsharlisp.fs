@@ -38,11 +38,9 @@ let safeCdr = function
   | _ -> Nil
 
 let symTable = ref [("nil", Nil)]
-let rec lookupSym str = function
-  | [] -> None
-  | (k, v)::rest ->
-      if k = str then Some v
-      else lookupSym str rest
+let lookupSym str tbl =
+  tbl
+  |> List.tryPick (fun (k, v) -> if k = str then Some v else None)
 let makeSym str =
   match lookupSym str !symTable with
   | Some sym -> sym
@@ -62,14 +60,13 @@ let makeCons a d = Cons(ref a, ref d)
 
 let makeExpr args env = Expr(safeCar args, safeCdr args, env)
 
-let rec nreconc lst tail =
-  match lst with
-  | Cons(a, d) ->
+let rec nreconc tail = function
+  | Cons(a, d) as lst ->
       let tmp = !d
       d := tail
-      nreconc tmp lst
+      nreconc lst tmp
   | _ -> tail
-let nreverse lst = nreconc lst Nil
+let nreverse = nreconc Nil
 
 let pairlis lst1 lst2 =
   let rec doit lst1 lst2 acc =
@@ -85,23 +82,15 @@ let isSpace c =
 let isDelimiter c =
   c = kLPar || c = kRPar || c = kQuote || isSpace c
 
-let skipSpaces str =
-  let rec doit i =
-    if i = String.length str then ""
-    else if isSpace str.[i] then doit (i + 1)
-    else String.sub str i (String.length str - i)
-  doit 0
+let skipSpaces (str: System.String) =
+  str.TrimStart()
 
 let makeNumOrSym str =
   try Num (int_of_string str) with
   | Failure "int_of_string" -> makeSym str
 
 let position f str =
-  let rec doit i =
-    if i = String.length str then None
-    else if f str.[i] then Some i
-    else doit (i + 1)
-  doit 0
+  str |> Seq.tryFindIndex f
 
 let readAtom str =
   match position isDelimiter str with
@@ -218,7 +207,7 @@ and progn body env acc =
   | _ -> acc
 and apply f args env =
   match f, args with
-  | Error e, _ -> Error e
+  | Error e, _
   | _, Error e -> Error e
   | Subr f1, _ -> f1 args
   | Expr(a, b, e) ,_ -> progn b (makeCons (pairlis a args) e) Nil
@@ -250,26 +239,29 @@ let subrSymbolp args =
   | Sym _ -> symT
   | _ -> Nil
 
+let (|ConsDeref|_|) x =
+  match x with
+  | Cons(a, d) -> Some (!a, !d)
+  | _ -> None
+
 let subrAddOrMul f initValue =
   let rec doit args acc =
     match args with
-    | Cons(a, d) ->
-        match !a, !d with
-        | Num num, rest -> doit rest (f(acc, num))
-        | _ -> Error "wrong type"
+    | ConsDeref(Num num, rest) -> doit rest (f acc num)
+    | ConsDeref _ -> Error "wrong type"
     | _ -> Num acc
   fun args -> doit args initValue
-let subrAdd = subrAddOrMul (fun (x, y) -> x + y) 0
-let subrMul = subrAddOrMul (fun (x, y) -> x * y) 1
+let subrAdd = subrAddOrMul (+) 0
+let subrMul = subrAddOrMul (*) 1
 
 let subrSubOrDivOrMod f =
   fun args ->
     match safeCar args, safeCar (safeCdr args) with
-    | Num x, Num y -> Num (f(x, y))
+    | Num x, Num y -> Num (f x y)
     | _ -> Error "wrong type"
-let subrSub = subrSubOrDivOrMod (fun (x, y) -> x - y)
-let subrDiv = subrSubOrDivOrMod (fun (x, y) -> x / y)
-let subrMod = subrSubOrDivOrMod (fun (x, y) -> x mod y)
+let subrSub = subrSubOrDivOrMod (-)
+let subrDiv = subrSubOrDivOrMod (/)
+let subrMod = subrSubOrDivOrMod (mod)
 
 let rec repl prompt =
   print_string prompt
