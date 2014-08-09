@@ -15,12 +15,17 @@ type obj =
   | Subr of (obj -> obj)
   | Expr of obj * obj * obj
 
+let (|ConsDeref|_|) x =
+  match x with
+  | Cons(a, d) -> Some (!a, !d)
+  | _ -> None
+
 let safeCar = function
-  | Cons(a, d) -> !a
+  | ConsDeref(a, d) -> a
   | _ -> Nil
 
 let safeCdr = function
-  | Cons(a, d) -> !d
+  | ConsDeref(a, d) -> d
   | _ -> Nil
 
 let symTable = ref [("nil", Nil)]
@@ -57,8 +62,8 @@ let nreverse = nreconc Nil
 let pairlis lst1 lst2 =
   let rec doit lst1 lst2 acc =
     match lst1, lst2 with
-    | Cons(a1, d1), Cons(a2, d2) ->
-        doit !d1 !d2 (makeCons (makeCons !a1 !a2) acc)
+    | ConsDeref(a1, d1), ConsDeref(a2, d2) ->
+        doit d1 d2 (makeCons (makeCons a1 a2) acc)
     | _ -> nreverse acc
   doit lst1 lst2 Nil
 
@@ -122,8 +127,8 @@ let rec printObj = function
   | Expr _ -> "<expr>"
 and printList obj delimiter acc =
   match obj with
-  | Cons(a, d) ->
-      printList !d " " (acc + delimiter + printObj !a)
+  | ConsDeref(a, d) ->
+      printList d " " (acc + delimiter + printObj a)
   | Nil -> acc
   | _ -> acc + " . " + printObj obj
 
@@ -134,9 +139,9 @@ let rec findVarInFrame str alist =
   | _ -> Nil
 let rec findVar sym env =
   match env, sym with
-  | Cons(a, d), Sym str ->
-      match findVarInFrame str !a with
-      | Nil -> findVar sym !d
+  | ConsDeref(a, d), Sym str ->
+      match findVarInFrame str a with
+      | Nil -> findVar sym d
       | pair -> pair
   | _ -> Nil
 
@@ -190,7 +195,7 @@ and evlis lst env acc =
     | elm -> evlis (safeCdr lst) env (makeCons elm acc)
 and progn body env acc =
   match body with
-  | Cons(a, d) -> progn !d env (eval !a env)
+  | ConsDeref(a, d) -> progn d env (eval a env)
   | _ -> acc
 and apply f args env =
   match f, args with
@@ -225,11 +230,6 @@ let subrSymbolp args =
   match safeCar args with
   | Sym _ -> symT
   | _ -> Nil
-
-let (|ConsDeref|_|) x =
-  match x with
-  | Cons(a, d) -> Some (!a, !d)
-  | _ -> None
 
 let subrAddOrMul f initValue =
   let rec doit args acc =
