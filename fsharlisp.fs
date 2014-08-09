@@ -7,13 +7,13 @@ let kRPar = ')'
 let kQuote = '\''
 
 type obj =
-| Nil
-| Num of int
-| Sym of string
-| Error of string
-| Cons of (obj ref) * obj ref
-| Subr of (obj -> obj)
-| Expr of obj * obj * obj
+  | Nil
+  | Num of int
+  | Sym of string
+  | Error of string
+  | Cons of obj ref * obj ref
+  | Subr of (obj -> obj)
+  | Expr of obj * obj * obj
 
 let safeCar = function
   | Cons(a, d) -> !a
@@ -87,21 +87,21 @@ let readAtom (str: System.String) =
   | None -> (makeNumOrSym str, "")
 
 let lookAhead str =
-   let str1 = skipSpaces str
-   let c = if str1 = "" then '_' else str.[0]
-   let rest = if str1 = "" then ""
-              else str1.Substring(1)
-   (str1, c, rest)
+  let str1 = skipSpaces str
+  let c = if str1 = "" then '_' else str.[0]
+  let rest = if str1 = "" then ""
+             else str1.Substring(1)
+  (str1, c, rest)
 
 let rec read str =
-  let (str1, c, rest) = lookAhead str
+  let str1, c, rest = lookAhead str
   if str1 = "" then (Error "empty input", "")
   else if c = kRPar then (Error ("invalid syntax: " + str1), "")
   else if c = kLPar then readList rest Nil
   else if c = kQuote then readQuote rest
   else readAtom str1
 and readQuote str =
-  let (elm, next) = read str
+  let elm, next = read str
   (makeCons (makeSym "quote") (makeCons elm Nil), next)
 and readList str acc =
   let str1, c, rest = lookAhead str
