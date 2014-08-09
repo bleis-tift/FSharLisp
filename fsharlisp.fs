@@ -1,3 +1,19 @@
+exception Failure of string
+
+let (==) a b = obj.ReferenceEquals(a, b)
+let (mod) a b = a % b
+
+let int_of_string (str: string) =
+  try int str with :? System.FormatException -> raise (Failure "int_of_string")
+let string_of_int (i: int) = string i
+
+let print_string str = printf "%s" str
+let print_newline () = printfn ""
+let read_line () = System.Console.ReadLine()
+
+module String =
+  let sub (str: System.String) start len = str.Substring(start, len)
+
 let kLPar = '('
 let kRPar = ')'
 let kQuote = '\''
