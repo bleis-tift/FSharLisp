@@ -1,3 +1,5 @@
+#nowarn "62"
+
 exception Failure of string
 
 let (==) a b = obj.ReferenceEquals(a, b)
